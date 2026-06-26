@@ -97,3 +97,24 @@ Stage Summary:
 - GPL-3.0 license (strict copyleft — derivatives must also be open source)
 - GitHub Actions CI/CD for Android APK builds
 - APK downloadable as artifact from Actions tab
+
+---
+Task ID: 4
+Agent: Main
+Task: Fix APK build pipeline and produce working Android APK
+
+Work Log:
+- Diagnosed 3 build failures via GitHub Actions log analysis:
+  1. Node.js v20 → Capacitor CLI requires Node >= 22 → Upgraded to v22
+  2. Java 17 → Capacitor Android requires Java 21 (source release 21) → Upgraded to v21
+  3. Capacitor webDir misconfiguration → Created proper www directory with index.html
+- Build #4 SUCCEEDED: BUILD SUCCESSFUL in 1m 28s, 93 Gradle tasks
+- APK artifact: throne-of-realms-apk, 128MB (debug build)
+- Fixed workflow triggers, permissions, and Capacitor config
+- APK available for download from GitHub Actions artifacts
+
+Stage Summary:
+- Android APK builds successfully via GitHub Actions CI/CD
+- APK download URL: https://github.com/boiniArun2006/throne-of-realms/actions (Artifacts section)
+- Build triggers on every push to main branch
+- Release APKs on version tags (v*)
