@@ -2,6 +2,8 @@
 // THRONE OF REALMS — Dungeon Scene (Real Assets)
 // Uses 0x72 DungeonTileset II + Dungeon Crawl Stone Soup
 // Side-scrolling combat dungeon with themed environments
+// FIXED: time.removeAllEvents() → specific dialogue timer
+// FIXED: Proper physics body creation for platforms
 // ============================================================
 
 import Phaser from 'phaser';
@@ -27,6 +29,7 @@ export class DungeonScene extends Phaser.Scene {
   private exitPortal!: Phaser.GameObjects.Sprite;
   private dungeonComplete: boolean = false;
   private musicManager!: MusicManager;
+  private playerDeathHandled: boolean = false;
 
   // Dialogue
   private dialogueActive: boolean = false;
@@ -34,6 +37,7 @@ export class DungeonScene extends Phaser.Scene {
   private dialogueLines: { speaker: string; text: string }[] = [];
   private dialogueIndex: number = 0;
   private _dialogueOnComplete: (() => void) | null = null;
+  private dialogueTimer: Phaser.Time.TimerEvent | null = null;
 
   constructor() {
     super({ key: SCENES.DUNGEON });
@@ -46,6 +50,7 @@ export class DungeonScene extends Phaser.Scene {
     this.boss = null;
     this.dungeonComplete = false;
     this.dialogueActive = false;
+    this.playerDeathHandled = false;
   }
 
   create(): void {
@@ -140,6 +145,12 @@ export class DungeonScene extends Phaser.Scene {
       this.exitPortal.setAngle(Math.sin(time / 300) * 3);
       this.exitPortal.setAlpha(0.8 + 0.2 * Math.sin(time / 200));
     }
+
+    // Check player death
+    if (this.player.isDead && !this.playerDeathHandled) {
+      this.playerDeathHandled = true;
+      this.onPlayerDeath();
+    }
   }
 
   // ============================================================
@@ -196,14 +207,14 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   // ============================================================
-  // DUNGEON LAYOUT
+  // DUNGEON LAYOUT — FIXED: proper physics bodies
   // ============================================================
   private createDungeonLayout(): void {
     this.platforms = this.physics.add.staticGroup();
     const tileColors = this.dungeonConfig.tileColors;
     const width = this.dungeonConfig.width;
 
-    // --- Ground ---
+    // --- Ground visual ---
     const groundGfx = this.add.graphics();
     groundGfx.fillStyle(tileColors.ground, 1);
     groundGfx.fillRect(0, GROUND_Y, width, GAME_HEIGHT - GROUND_Y);
@@ -212,13 +223,13 @@ export class DungeonScene extends Phaser.Scene {
     // Ground top edge highlight
     groundGfx.fillStyle(tileColors.accent, 0.5);
     groundGfx.fillRect(0, GROUND_Y, width, 4);
-    groundGfx.setDepth(3);
 
-    // Ground physics body
-    const groundBody = this.add.rectangle(width / 2, GROUND_Y + 80, width, 160, 0x000000, 0);
+    // Ground physics body (proper static body)
+    const groundBody = this.add.rectangle(width / 2, GROUND_Y + (GAME_HEIGHT - GROUND_Y) / 2, width, GAME_HEIGHT - GROUND_Y, 0x000000, 0);
+    this.physics.add.existing(groundBody, true); // static = true
     this.platforms.add(groundBody);
 
-    // --- Platforms (procedural) ---
+    // --- Platforms (procedural) with proper physics ---
     const platformPatterns = this.generatePlatformLayout();
     for (const plat of platformPatterns) {
       const platGfx = this.add.graphics();
@@ -228,21 +239,29 @@ export class DungeonScene extends Phaser.Scene {
       platGfx.fillRect(0, 0, plat.width, 3);
       platGfx.lineStyle(1, tileColors.decoration, 0.3);
       platGfx.strokeRect(0, 0, plat.width, 12);
-      platGfx.generateTexture(`dng_plat_${plat.x}_${plat.y}`, plat.width, 12);
+      const texKey = `dng_plat_${plat.x}_${plat.y}`;
+      platGfx.generateTexture(texKey, plat.width, 12);
       platGfx.destroy();
 
-      const platform = this.add.image(plat.x + plat.width / 2, plat.y + 6, `dng_plat_${plat.x}_${plat.y}`);
-      platform.setDepth(5);
-      this.platforms.add(platform);
+      const platformVisual = this.add.image(plat.x + plat.width / 2, plat.y + 6, texKey);
+      platformVisual.setDepth(5);
+
+      // Separate physics body for platform
+      const platBody = this.add.rectangle(plat.x + plat.width / 2, plat.y + 6, plat.width, 12, 0x000000, 0);
+      this.physics.add.existing(platBody, true);
+      this.platforms.add(platBody);
     }
 
     // --- Decorations ---
     this.createDungeonDecorations();
 
     // --- Walls ---
-    const leftWall = this.add.rectangle(0, GAME_HEIGHT / 2, 16, GAME_HEIGHT, tileColors.platform);
+    const leftWall = this.add.rectangle(0, GAME_HEIGHT / 2, 16, GAME_HEIGHT, 0x000000, 0);
+    this.physics.add.existing(leftWall, true);
     this.platforms.add(leftWall);
-    const rightWall = this.add.rectangle(width, GAME_HEIGHT / 2, 16, GAME_HEIGHT, tileColors.platform);
+
+    const rightWall = this.add.rectangle(width, GAME_HEIGHT / 2, 16, GAME_HEIGHT, 0x000000, 0);
+    this.physics.add.existing(rightWall, true);
     this.platforms.add(rightWall);
   }
 
@@ -328,18 +347,24 @@ export class DungeonScene extends Phaser.Scene {
       const hitbox = this.player.getAttackHitbox();
       for (const enemy of this.enemies) {
         if (!enemy.isAlive) continue;
-        if (Phaser.Geom.Intersects.RectangleToRectangle(hitbox.getBounds(), enemy.getBounds())) {
-          const knockDir = data.facing === 'right' ? 'right' : 'left';
-          enemy.takeDamage(data.damage, knockDir);
-          this.spawnHitEffect(enemy.x, enemy.y - 20);
-          if (data.combo >= 2) {
-            this.showFloatingText(enemy.x, enemy.y - 60, `${data.combo}x COMBO!`, '#ffd700');
+        try {
+          const hitboxBounds = hitbox.getBounds();
+          const enemyBounds = enemy.getBounds();
+          if (Phaser.Geom.Intersects.RectangleToRectangle(hitboxBounds, enemyBounds)) {
+            const knockDir = data.facing === 'right' ? 'right' : 'left';
+            enemy.takeDamage(data.damage, knockDir);
+            this.spawnHitEffect(enemy.x, enemy.y - 20);
+            if (data.combo >= 2) {
+              this.showFloatingText(enemy.x, enemy.y - 60, `${data.combo}x COMBO!`, '#ffd700');
+            }
           }
+        } catch (e) {
+          // Bounds calculation may fail for destroyed objects
         }
       }
     });
 
-    // Enemy attacks
+    // Enemy attacks (check periodically)
     this.time.addEvent({
       delay: 100, loop: true,
       callback: () => {
@@ -352,6 +377,41 @@ export class DungeonScene extends Phaser.Scene {
           }
         }
       },
+    });
+
+    // Listen for player hurt to update HUD
+    this.player.events.on('hurt', (data: { hp: number; maxHp: number }) => {
+      const hud = this.scene.get(SCENES.HUD) as any;
+      if (hud && typeof hud.updateHealth === 'function') {
+        hud.updateHealth(data.hp, data.maxHp);
+      }
+    });
+
+    this.player.events.on('transform', (data: { hp: number; maxHp: number; attack: number }) => {
+      const hud = this.scene.get(SCENES.HUD) as any;
+      if (hud && typeof hud.updateHealth === 'function') {
+        hud.updateHealth(data.hp, data.maxHp);
+      }
+    });
+  }
+
+  // ============================================================
+  // PLAYER DEATH
+  // ============================================================
+  private onPlayerDeath(): void {
+    this.musicManager.stop(500);
+
+    this.time.delayedCall(2000, () => {
+      // Show death dialogue
+      this.startDialogue([
+        { speaker: 'Veer', text: 'I... I failed...' },
+        { speaker: 'Narrator', text: 'The darkness claims another soul. But the portals remain open...' },
+      ], () => {
+        // Return to hub with restored HP
+        this.player.hp = this.player.maxHp;
+        this.scene.stop(SCENES.HUD);
+        this.scene.start(SCENES.HUB, { returningFromDungeon: true });
+      });
     });
   }
 
@@ -431,7 +491,7 @@ export class DungeonScene extends Phaser.Scene {
   }
 
   // ============================================================
-  // DIALOGUE
+  // DIALOGUE — FIXED: no more removeAllEvents()
   // ============================================================
   private createDialogueOverlay(): void {
     this.dialogueOverlay = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT - 80);
@@ -477,10 +537,19 @@ export class DungeonScene extends Phaser.Scene {
     speakerText.setText(line.speaker);
     speakerText.setColor(speakerColors[line.speaker] || '#ffd700');
     dialogueText.setText('');
+
+    // Cancel only the dialogue timer, NOT all timers
+    if (this.dialogueTimer) {
+      this.dialogueTimer.remove();
+      this.dialogueTimer = null;
+    }
+
     const chars = line.text.split('');
     let idx = 0;
-    this.time.removeAllEvents();
-    this.time.addEvent({ delay: 25, repeat: chars.length - 1, callback: () => { if (idx < chars.length) dialogueText.setText(dialogueText.text + chars[idx++]); } });
+    this.dialogueTimer = this.time.addEvent({
+      delay: 25, repeat: chars.length - 1,
+      callback: () => { if (idx < chars.length) dialogueText.setText(dialogueText.text + chars[idx++]); },
+    });
   }
 
   private advanceDialogue(): void {
@@ -492,6 +561,11 @@ export class DungeonScene extends Phaser.Scene {
   private endDialogue(): void {
     this.dialogueActive = false;
     this.dialogueOverlay.setVisible(false);
+    // Clean up dialogue timer
+    if (this.dialogueTimer) {
+      this.dialogueTimer.remove();
+      this.dialogueTimer = null;
+    }
     if (this._dialogueOnComplete) { this._dialogueOnComplete(); this._dialogueOnComplete = null; }
   }
 }

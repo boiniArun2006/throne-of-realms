@@ -80,7 +80,8 @@ export class Player extends Phaser.GameObjects.Container {
     this.body.setSize(30, 70);
     this.body.setOffset(-15, -60);
     this.body.setCollideWorldBounds(true);
-    this.body.setGravityY(800);
+    // Gravity is now set globally in game config (y: 800)
+    // Individual setGravityY is no longer needed and could cause double-gravity
 
     // Input
     if (scene.input.keyboard) {

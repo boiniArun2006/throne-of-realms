@@ -133,7 +133,7 @@ export class Enemy extends Phaser.GameObjects.Container {
     this.body.setSize(this.config.size.width, this.config.size.height);
     this.body.setOffset(-this.config.size.width / 2, -this.config.size.height);
     this.body.setCollideWorldBounds(true);
-    this.body.setGravityY(800);
+    // Gravity is now set globally in game config (y: 800)
 
     this.setDepth(5);
     scene.add.existing(this);

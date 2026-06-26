@@ -2,6 +2,7 @@
 // THRONE OF REALMS — Main Menu Scene
 // Epic title screen with animated background + music
 // Uses Press Start 2P + MedievalSharp fonts
+// FIXED: Memory leak (Graphics created every frame)
 // ============================================================
 
 import Phaser from 'phaser';
@@ -15,7 +16,9 @@ export class MenuScene extends Phaser.Scene {
   private musicManager!: MusicManager;
   private bgStars: { x: number; y: number; speed: number; size: number; alpha: number }[] = [];
   private portalAngle: number = 0;
-  private particles: Phaser.GameObjects.Graphics[] = [];
+  private starGraphics!: Phaser.GameObjects.Graphics;
+  private portalGfx!: Phaser.GameObjects.Graphics;
+  private logoImage!: Phaser.GameObjects.Image;
 
   constructor() {
     super({ key: SCENES.MENU });
@@ -26,7 +29,7 @@ export class MenuScene extends Phaser.Scene {
     this.musicManager = new MusicManager(this);
     this.musicManager.play('music_menu', { volume: 0.25, loop: true });
 
-    // --- Background ---
+    // --- Background gradient ---
     const bg = this.add.graphics();
     for (let y = 0; y < GAME_HEIGHT; y++) {
       const ratio = y / GAME_HEIGHT;
@@ -38,7 +41,7 @@ export class MenuScene extends Phaser.Scene {
     }
     bg.setDepth(0);
 
-    // --- Star field ---
+    // --- Star field data ---
     for (let i = 0; i < 60; i++) {
       this.bgStars.push({
         x: Phaser.Math.Between(0, GAME_WIDTH),
@@ -49,11 +52,23 @@ export class MenuScene extends Phaser.Scene {
       });
     }
 
-    // --- Portal animation ---
-    this.createPortalEffect(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30);
+    // --- Star graphics (created once, redrawn each frame) ---
+    this.starGraphics = this.add.graphics();
+    this.starGraphics.setDepth(1);
+
+    // --- Portal graphics (created once, redrawn each frame) ---
+    this.portalGfx = this.add.graphics();
+    this.portalGfx.setDepth(2);
+
+    // --- Game Logo Image ---
+    if (this.textures.exists('game_logo')) {
+      this.logoImage = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 110, 'game_logo');
+      this.logoImage.setScale(0.35);
+      this.logoImage.setDepth(9);
+    }
 
     // --- Title (MedievalSharp for fantasy headings) ---
-    this.titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, GAME_TITLE, {
+    this.titleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, GAME_TITLE, {
       fontSize: '40px',
       fontFamily: 'MedievalSharp, serif',
       fontStyle: 'bold',
@@ -64,7 +79,7 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(10);
 
     // --- Subtitle (Press Start 2P for pixel text) ---
-    this.subtitleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 35, GAME_SUBTITLE, {
+    this.subtitleText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_SUBTITLE, {
       fontSize: '10px',
       fontFamily: '"Press Start 2P", monospace',
       color: '#e0b0ff',
@@ -83,7 +98,7 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(10);
 
     // --- Version ---
-    this.add.text(GAME_WIDTH - 10, GAME_HEIGHT - 10, 'v0.2.0-alpha', {
+    this.add.text(GAME_WIDTH - 10, GAME_HEIGHT - 10, 'v0.3.0-alpha', {
       fontSize: '8px',
       fontFamily: '"Silkscreen", monospace',
       color: '#404040',
@@ -95,7 +110,6 @@ export class MenuScene extends Phaser.Scene {
 
     // --- Touch to start ---
     this.input.on('pointerdown', () => {
-      // On mobile, tap anywhere to start
       if (!this.game.device.os.desktop) {
         this.startGame();
       }
@@ -103,77 +117,55 @@ export class MenuScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
-    // Animate stars
-    const starGraphics = this.add.graphics();
-    starGraphics.setDepth(1);
+    // --- Animate stars (reuse single Graphics object) ---
+    this.starGraphics.clear();
     for (const star of this.bgStars) {
       star.y += star.speed * (delta / 16);
       if (star.y > GAME_HEIGHT) {
         star.y = 0;
         star.x = Phaser.Math.Between(0, GAME_WIDTH);
       }
-      starGraphics.fillStyle(0xffffff, star.alpha * (0.5 + 0.5 * Math.sin(time / 1000 + star.x)));
-      starGraphics.fillCircle(star.x, star.y, star.size);
+      this.starGraphics.fillStyle(0xffffff, star.alpha * (0.5 + 0.5 * Math.sin(time / 1000 + star.x)));
+      this.starGraphics.fillCircle(star.x, star.y, star.size);
     }
 
-    // Portal rotation
+    // --- Portal rotation ---
     this.portalAngle += delta * 0.002;
+    this.drawPortal();
 
-    // Title pulse
+    // --- Title pulse ---
     const pulse = 1 + 0.03 * Math.sin(time / 500);
     this.titleText.setScale(pulse);
 
-    // Subtitle shimmer
+    // --- Subtitle shimmer ---
     this.subtitleText.setAlpha(0.7 + 0.3 * Math.sin(time / 800));
 
-    // Clean particles
-    this.particles.forEach(p => p.destroy());
-    this.particles = [];
-
-    // Portal particles
-    if (Phaser.Math.Between(0, 3) === 0) {
-      const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-      const dist = Phaser.Math.Between(40, 80);
-      const px = GAME_WIDTH / 2 + Math.cos(angle) * dist;
-      const py = GAME_HEIGHT / 2 - 30 + Math.sin(angle) * dist;
-      const particle = this.add.graphics();
-      particle.fillStyle(0xe0b0ff, 0.6);
-      particle.fillCircle(0, 0, Phaser.Math.Between(1, 3));
-      particle.setPosition(px, py);
-      particle.setDepth(2);
-      this.particles.push(particle);
-      this.tweens.add({
-        targets: particle, alpha: 0, y: py - 30, duration: 1000,
-        onComplete: () => particle.destroy(),
-      });
+    // --- Logo pulse ---
+    if (this.logoImage) {
+      const logoPulse = 0.35 + 0.01 * Math.sin(time / 600);
+      this.logoImage.setScale(logoPulse);
     }
   }
 
-  private createPortalEffect(cx: number, cy: number): void {
-    const portal = this.add.graphics();
-    portal.setDepth(2);
-
-    const drawPortal = () => {
-      portal.clear();
-      for (let i = 0; i < 3; i++) {
-        const angle = this.portalAngle + (i * Math.PI * 2) / 3;
-        const radius = 60 + i * 15;
-        portal.lineStyle(2, 0x8a2be2, 0.3 + i * 0.15);
-        portal.beginPath();
-        portal.arc(cx, cy, radius, angle, angle + 2);
-        portal.strokePath();
-      }
-      portal.fillStyle(0xe0b0ff, 0.15 + 0.05 * Math.sin(this.portalAngle * 3));
-      portal.fillCircle(cx, cy, 40);
-    };
-
-    this.events.on('update', drawPortal);
-    drawPortal();
+  private drawPortal(): void {
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2 + 20;
+    this.portalGfx.clear();
+    for (let i = 0; i < 3; i++) {
+      const angle = this.portalAngle + (i * Math.PI * 2) / 3;
+      const radius = 60 + i * 15;
+      this.portalGfx.lineStyle(2, 0x8a2be2, 0.3 + i * 0.15);
+      this.portalGfx.beginPath();
+      this.portalGfx.arc(cx, cy, radius, angle, angle + 2);
+      this.portalGfx.strokePath();
+    }
+    this.portalGfx.fillStyle(0xe0b0ff, 0.15 + 0.05 * Math.sin(this.portalAngle * 3));
+    this.portalGfx.fillCircle(cx, cy, 40);
   }
 
   private createStartButton(): void {
     const btnX = GAME_WIDTH / 2;
-    const btnY = GAME_HEIGHT / 2 + 40;
+    const btnY = GAME_HEIGHT / 2 + 70;
 
     // Button background (golden/warm — NO neon)
     const btnBg = this.add.graphics();

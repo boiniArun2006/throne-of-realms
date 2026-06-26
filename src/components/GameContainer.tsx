@@ -3,6 +3,7 @@
 // ============================================================
 // THRONE OF REALMS — Game Container Component
 // React component that creates and manages the Phaser game instance
+// FIXED: Better error handling and loading states
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react';
@@ -41,7 +42,17 @@ export default function GameContainer() {
         gameRef.current = game;
         // Expose game instance for testing/debugging
         (window as any).__PHASER_GAME__ = game;
-        setIsLoading(false);
+
+        // Wait for the game to be ready before hiding loading state
+        if (game.isBooted) {
+          setIsLoading(false);
+        } else {
+          game.events.once('ready', () => {
+            setIsLoading(false);
+          });
+          // Fallback: hide loading after 5 seconds regardless
+          setTimeout(() => setIsLoading(false), 5000);
+        }
 
         // Handle game events
         game.events.on('destroy', () => {
@@ -68,23 +79,13 @@ export default function GameContainer() {
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center bg-[#0a0a1e]">
-      {/* Game Title Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-black/40">
-        <div className="flex items-center gap-2">
-          <span className="text-yellow-400 font-mono font-bold text-sm">{GAME_TITLE}</span>
-          <span className="text-purple-300 font-mono text-xs">— {GAME_SUBTITLE}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-gray-400 font-mono text-xs">Alpha v0.1.0</span>
-        </div>
-      </div>
-
       {/* Loading State */}
       {isLoading && !error && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0a0a1e]">
           <div className="text-2xl font-mono font-bold text-yellow-400 mb-4">{GAME_TITLE}</div>
+          <div className="text-sm font-mono text-purple-300 mb-6">{GAME_SUBTITLE}</div>
           <div className="w-48 h-2 bg-gray-800 rounded overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400 animate-pulse rounded" style={{ width: '60%' }} />
+            <div className="h-full bg-yellow-600 rounded animate-pulse" style={{ width: '60%' }} />
           </div>
           <div className="text-gray-400 font-mono text-sm mt-3">Forging divine weapons...</div>
         </div>
@@ -111,17 +112,6 @@ export default function GameContainer() {
         className="w-full flex-1 flex items-center justify-center"
         style={{ minHeight: '400px' }}
       />
-
-      {/* Controls Help Footer */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center justify-center px-4 py-2 bg-black/40">
-        <div className="flex items-center gap-4 text-gray-400 font-mono text-xs">
-          <span><kbd className="px-1 bg-gray-700 rounded text-gray-200">←→</kbd> / <kbd className="px-1 bg-gray-700 rounded text-gray-200">WASD</kbd> Move</span>
-          <span className="text-gray-600">|</span>
-          <span><kbd className="px-1 bg-gray-700 rounded text-gray-200">Z</kbd> / <kbd className="px-1 bg-gray-700 rounded text-gray-200">Space</kbd> Attack</span>
-          <span className="text-gray-600">|</span>
-          <span><kbd className="px-1 bg-gray-700 rounded text-gray-200">X</kbd> Interact</span>
-        </div>
-      </div>
     </div>
   );
 }

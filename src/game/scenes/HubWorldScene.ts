@@ -2,6 +2,8 @@
 // THRONE OF REALMS — Hub World Scene (Real Assets)
 // Village of Avani with Kenney Platformer Deluxe tilesets
 // Parallax backgrounds, buildings, NPCs, bathroom portal
+// FIXED: time.removeAllEvents() killing all timers
+// FIXED: StaticGroup physics bodies need proper setup
 // ============================================================
 
 import Phaser from 'phaser';
@@ -29,6 +31,7 @@ export class HubWorldScene extends Phaser.Scene {
   private _dialogueOnComplete: (() => void) | null = null;
   private bathroomPortal!: Phaser.GameObjects.Sprite;
   private musicManager!: MusicManager;
+  private dialogueTimer: Phaser.Time.TimerEvent | null = null;
 
   constructor() {
     super({ key: SCENES.HUB });
@@ -157,20 +160,28 @@ export class HubWorldScene extends Phaser.Scene {
   }
 
   // ============================================================
-  // ENVIRONMENT
+  // ENVIRONMENT — FIXED: proper physics body creation
   // ============================================================
   private createEnvironment(): void {
     this.platforms = this.physics.add.staticGroup();
 
-    // --- Main ground using Kenney tile sprites ---
-    // Use tile sprites for seamless ground
-    const groundTop = this.add.tileSprite(WORLD_WIDTH / 2, GROUND_Y, WORLD_WIDTH, TILE_SIZE, 'tile_grass');
-    groundTop.setDepth(3);
-    this.platforms.add(groundTop);
+    // --- Main ground using physics rectangles with tileSprite visuals ---
+    // Ground top layer (grass visual + physics)
+    const groundTopVisual = this.add.tileSprite(WORLD_WIDTH / 2, GROUND_Y, WORLD_WIDTH, TILE_SIZE, 'tile_grass');
+    groundTopVisual.setDepth(3);
+    // Create a separate invisible physics body for the ground
+    const groundTopBody = this.add.rectangle(WORLD_WIDTH / 2, GROUND_Y + TILE_SIZE / 2, WORLD_WIDTH, TILE_SIZE, 0x000000, 0);
+    this.physics.add.existing(groundTopBody, true); // static=true
+    this.platforms.add(groundTopBody);
 
-    const groundDirt = this.add.tileSprite(WORLD_WIDTH / 2, GROUND_Y + TILE_SIZE * 2, WORLD_WIDTH, TILE_SIZE * 4, 'tile_dirt');
-    groundDirt.setDepth(3);
-    this.platforms.add(groundDirt);
+    // Ground fill layer (dirt visual, no physics needed — it's below)
+    const groundDirtVisual = this.add.tileSprite(WORLD_WIDTH / 2, GROUND_Y + TILE_SIZE * 2, WORLD_WIDTH, TILE_SIZE * 4, 'tile_dirt');
+    groundDirtVisual.setDepth(3);
+
+    // --- Sub-ground physics body (prevents falling through) ---
+    const subGround = this.add.rectangle(WORLD_WIDTH / 2, GROUND_Y + TILE_SIZE * 3, WORLD_WIDTH, TILE_SIZE * 4, 0x000000, 0);
+    this.physics.add.existing(subGround, true);
+    this.platforms.add(subGround);
 
     // --- Veer's House (half-constructed) ---
     this.buildHouse(200);
@@ -179,9 +190,8 @@ export class HubWorldScene extends Phaser.Scene {
     this.buildBathroom(450);
 
     // --- Stone path / bridge ---
-    const bridge = this.add.tileSprite(700, GROUND_Y, 200, TILE_SIZE, 'tile_stone');
-    bridge.setDepth(4);
-    this.platforms.add(bridge);
+    const bridgeVisual = this.add.tileSprite(700, GROUND_Y, 200, TILE_SIZE, 'tile_stone');
+    bridgeVisual.setDepth(4);
 
     // --- Temple area ---
     this.buildTemple(1000);
@@ -189,33 +199,38 @@ export class HubWorldScene extends Phaser.Scene {
     // --- Flower shop area ---
     this.buildFlowerShop(1350);
 
-    // --- Water area ---
+    // --- Water area (decorative only, no physics) ---
     const water = this.add.tileSprite(1700, GROUND_Y + TILE_SIZE, 200, TILE_SIZE * 2, 'tile_water');
     water.setDepth(3);
-    const waterBridge = this.add.tileSprite(1700, GROUND_Y, 200, TILE_SIZE, 'tile_stone');
-    waterBridge.setDepth(5);
-    this.platforms.add(waterBridge);
+    const waterBridgeVisual = this.add.tileSprite(1700, GROUND_Y, 200, TILE_SIZE, 'tile_stone');
+    waterBridgeVisual.setDepth(5);
 
     // --- Decorations ---
     this.placeDecorations();
 
-    // --- Upper platforms for exploration ---
+    // --- Upper platforms for exploration (with proper physics) ---
     const platPositions = [
-      { x: 500, y: GROUND_Y - 120 },
-      { x: 800, y: GROUND_Y - 150 },
-      { x: 1100, y: GROUND_Y - 130 },
-      { x: 1500, y: GROUND_Y - 110 },
+      { x: 500, y: GROUND_Y - 120, w: 100 },
+      { x: 800, y: GROUND_Y - 150, w: 120 },
+      { x: 1100, y: GROUND_Y - 130, w: 110 },
+      { x: 1500, y: GROUND_Y - 110, w: 100 },
     ];
     for (const pos of platPositions) {
-      const plat = this.add.tileSprite(pos.x, pos.y, 100, 12, 'tile_stone');
-      plat.setDepth(5);
-      this.platforms.add(plat);
+      const platVisual = this.add.tileSprite(pos.x, pos.y, pos.w, 12, 'tile_stone');
+      platVisual.setDepth(5);
+      // Create physics body separately
+      const platBody = this.add.rectangle(pos.x, pos.y + 6, pos.w, 12, 0x000000, 0);
+      this.physics.add.existing(platBody, true);
+      this.platforms.add(platBody);
     }
 
-    // --- World walls ---
-    const leftWall = this.add.rectangle(0, GROUND_Y / 2, 16, GROUND_Y, 0x333333);
+    // --- World walls (prevent going out of bounds) ---
+    const leftWall = this.add.rectangle(0, GROUND_Y / 2, 32, WORLD_HEIGHT, 0x000000, 0);
+    this.physics.add.existing(leftWall, true);
     this.platforms.add(leftWall);
-    const rightWall = this.add.rectangle(WORLD_WIDTH, GROUND_Y / 2, 16, GROUND_Y, 0x333333);
+
+    const rightWall = this.add.rectangle(WORLD_WIDTH, GROUND_Y / 2, 32, WORLD_HEIGHT, 0x000000, 0);
+    this.physics.add.existing(rightWall, true);
     this.platforms.add(rightWall);
   }
 
@@ -346,8 +361,9 @@ export class HubWorldScene extends Phaser.Scene {
     temple.fillRect(x - 10, GROUND_Y - 94, 20, 6);
     temple.fillRect(x - 5, GROUND_Y - 98, 10, 4);
 
-    // Temple steps platform
-    const templePlatform = this.add.rectangle(x, GROUND_Y, 110, 8, 0x909090);
+    // Temple steps platform (physics)
+    const templePlatform = this.add.rectangle(x, GROUND_Y, 110, 8, 0x000000, 0);
+    this.physics.add.existing(templePlatform, true);
     this.platforms.add(templePlatform);
 
     // Torii pillars
@@ -412,41 +428,53 @@ export class HubWorldScene extends Phaser.Scene {
   private placeDecorations(): void {
     // Torches along path
     for (let x = 300; x < WORLD_WIDTH - 200; x += 180) {
-      const torch = this.add.image(x, GROUND_Y - 10, 'obj_torch_lit');
-      torch.setScale(0.8);
-      torch.setDepth(4);
+      if (this.textures.exists('obj_torch_lit')) {
+        const torch = this.add.image(x, GROUND_Y - 10, 'obj_torch_lit');
+        torch.setScale(0.8);
+        torch.setDepth(4);
+      }
     }
 
     // Flags
-    this.add.image(600, GROUND_Y - 40, 'obj_flag_red').setScale(0.8).setDepth(4);
-    this.add.image(1200, GROUND_Y - 40, 'obj_flag_green').setScale(0.8).setDepth(4);
+    if (this.textures.exists('obj_flag_red')) {
+      this.add.image(600, GROUND_Y - 40, 'obj_flag_red').setScale(0.8).setDepth(4);
+    }
+    if (this.textures.exists('obj_flag_green')) {
+      this.add.image(1200, GROUND_Y - 40, 'obj_flag_green').setScale(0.8).setDepth(4);
+    }
 
     // Sign
-    this.add.image(650, GROUND_Y - 10, 'obj_sign').setScale(0.8).setDepth(4);
+    if (this.textures.exists('obj_sign')) {
+      this.add.image(650, GROUND_Y - 10, 'obj_sign').setScale(0.8).setDepth(4);
+    }
 
     // Coins scattered (decorative)
-    for (let i = 0; i < 8; i++) {
-      const cx = 300 + i * 250 + Phaser.Math.Between(-20, 20);
-      const coin = this.add.image(cx, GROUND_Y - 8, 'item_coin');
-      coin.setScale(0.5);
-      coin.setDepth(4);
+    if (this.textures.exists('item_coin')) {
+      for (let i = 0; i < 8; i++) {
+        const cx = 300 + i * 250 + Phaser.Math.Between(-20, 20);
+        const coin = this.add.image(cx, GROUND_Y - 8, 'item_coin');
+        coin.setScale(0.5);
+        coin.setDepth(4);
 
-      // Bobbing animation
-      this.tweens.add({
-        targets: coin,
-        y: coin.y - 4,
-        duration: 800 + i * 100,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut',
-      });
+        // Bobbing animation
+        this.tweens.add({
+          targets: coin,
+          y: coin.y - 4,
+          duration: 800 + i * 100,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      }
     }
 
     // Fences
-    for (let x = 900; x < 980; x += 20) {
-      const fence = this.add.image(x, GROUND_Y - 8, 'obj_fence');
-      fence.setScale(0.7);
-      fence.setDepth(4);
+    if (this.textures.exists('obj_fence')) {
+      for (let x = 900; x < 980; x += 20) {
+        const fence = this.add.image(x, GROUND_Y - 8, 'obj_fence');
+        fence.setScale(0.7);
+        fence.setDepth(4);
+      }
     }
   }
 
@@ -564,7 +592,7 @@ export class HubWorldScene extends Phaser.Scene {
   }
 
   // ============================================================
-  // DIALOGUE SYSTEM
+  // DIALOGUE SYSTEM — FIXED: no more removeAllEvents()
   // ============================================================
   private createDialogueOverlay(): void {
     this.dialogueOverlay = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT - 80);
@@ -621,12 +649,21 @@ export class HubWorldScene extends Phaser.Scene {
     speakerText.setColor(speakerColors[line.speaker] || '#ffd700');
     dialogueText.setText('');
 
+    // Cancel only the dialogue typewriter timer, NOT all timers
+    if (this.dialogueTimer) {
+      this.dialogueTimer.remove();
+      this.dialogueTimer = null;
+    }
+
     const chars = line.text.split('');
     let idx = 0;
-    this.time.removeAllEvents();
-    this.time.addEvent({
+    this.dialogueTimer = this.time.addEvent({
       delay: 25, repeat: chars.length - 1,
-      callback: () => { if (idx < chars.length) { dialogueText.setText(dialogueText.text + chars[idx++]); } },
+      callback: () => {
+        if (idx < chars.length) {
+          dialogueText.setText(dialogueText.text + chars[idx++]);
+        }
+      },
     });
   }
 
@@ -639,6 +676,11 @@ export class HubWorldScene extends Phaser.Scene {
   private endDialogue(): void {
     this.dialogueActive = false;
     this.dialogueOverlay.setVisible(false);
+    // Clean up dialogue timer
+    if (this.dialogueTimer) {
+      this.dialogueTimer.remove();
+      this.dialogueTimer = null;
+    }
     if (this._dialogueOnComplete) { this._dialogueOnComplete(); this._dialogueOnComplete = null; }
   }
 

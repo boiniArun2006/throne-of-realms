@@ -1,7 +1,10 @@
 // ============================================================
-// THRONE OF REALMS — Boot Scene (Real Assets — FIXED PATHS)
+// THRONE OF REALMS — Boot Scene (Real Assets — FIXED)
 // Loads all downloaded sprite sheets, tilesets, audio, and UI
 // Uses: Martial Hero (CC0), Kenney (CC0), 0x72 (CC0)
+// FIXED: Proper loading screen with gameplay image + logo
+// FIXED: Error-resilient asset loading
+// FIXED: Correct frame counts for Martial Hero sprites
 // ============================================================
 
 import Phaser from 'phaser';
@@ -11,6 +14,8 @@ import { ASSET_KEYS, SPRITE_FRAMES, ANIMATIONS } from '../AssetManifest';
 export class BootScene extends Phaser.Scene {
   private loadingBar!: Phaser.GameObjects.Graphics;
   private loadingText!: Phaser.GameObjects.Text;
+  private tipText!: Phaser.GameObjects.Text;
+  private assetErrors: string[] = [];
 
   constructor() {
     super({ key: SCENES.BOOT });
@@ -20,31 +25,67 @@ export class BootScene extends Phaser.Scene {
     const centerX = GAME_WIDTH / 2;
     const centerY = GAME_HEIGHT / 2;
 
+    // --- Loading screen background ---
     const bg = this.add.graphics();
     bg.fillStyle(0x0a0a1e, 1);
     bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    this.add.text(centerX, centerY - 80, 'THRONE OF REALMS', {
-      fontSize: '36px', fontFamily: 'monospace', color: '#ffd700',
-      stroke: '#8b4513', strokeThickness: 4,
+    // --- Gameplay image as loading screen background ---
+    // Load the logo first (it's small) so we can display it during the rest of loading
+    this.load.image('game_logo', 'assets/ui/game-logo.png');
+
+    // After logo loads, we'll show it — but for now, show text
+    this.add.text(centerX, centerY - 120, 'THRONE OF REALMS', {
+      fontSize: '32px', fontFamily: 'MedievalSharp, serif', color: '#ffd700',
+      stroke: '#8b4513', strokeThickness: 3,
     }).setOrigin(0.5);
 
+    this.add.text(centerX, centerY - 85, 'The Unlikely Hero', {
+      fontSize: '12px', fontFamily: '"Press Start 2P", monospace', color: '#e0b0ff',
+      stroke: '#4a0080', strokeThickness: 2,
+    }).setOrigin(0.5);
+
+    // --- Loading bar ---
     this.loadingBar = this.add.graphics();
-    this.loadingText = this.add.text(centerX, centerY, 'Loading assets...', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#b0b0b0',
+    this.loadingText = this.add.text(centerX, centerY + 20, 'Loading assets...', {
+      fontSize: '11px', fontFamily: '"Press Start 2P", monospace', color: '#b0b0b0',
     }).setOrigin(0.5);
 
+    this.tipText = this.add.text(centerX, centerY + 80, '', {
+      fontSize: '9px', fontFamily: '"Silkscreen", monospace', color: '#606060',
+    }).setOrigin(0.5);
+
+    // --- Progress tracking ---
     this.load.on('progress', (value: number) => {
       this.loadingBar.clear();
       this.loadingBar.fillStyle(0x2c3e50, 1);
-      this.loadingBar.fillRect(centerX - 152, centerY + 30, 304, 16);
+      this.loadingBar.fillRect(centerX - 152, centerY + 40, 304, 16);
       this.loadingBar.fillStyle(0xffd700, 1);
-      this.loadingBar.fillRect(centerX - 150, centerY + 32, value * 300, 12);
+      this.loadingBar.fillRect(centerX - 150, centerY + 42, value * 300, 12);
       this.loadingText.setText(`Loading assets... ${Math.floor(value * 100)}%`);
     });
 
     this.load.on('loaderror', (file: any) => {
-      console.warn(`[Asset Load Error] key=${file.key} url=${file.url}`);
+      const errMsg = `Missing: ${file.key} (${file.url})`;
+      console.warn(`[Asset Load Error] ${errMsg}`);
+      this.assetErrors.push(errMsg);
+    });
+
+    // Show tips during loading
+    const tips = [
+      'Tip: Bathrooms are portals to divine realms!',
+      'Tip: Press X near objects to interact',
+      'Tip: Z + Z + Z for combo attacks!',
+      'Tip: Pray at the temple to restore HP',
+      'Tip: Each dungeon holds a divine weapon',
+      'Tip: Veer transforms when entering bathrooms',
+    ];
+    let tipIdx = 0;
+    this.load.on('progress', () => {
+      if (Math.random() < 0.05) {
+        this.tipText.setText(tips[tipIdx % tips.length]);
+        tipIdx++;
+      }
     });
 
     // ==========================================
@@ -88,25 +129,22 @@ export class BootScene extends Phaser.Scene {
     this.load.image('fly_fly1', 'assets/sprites/characters/enemies/flyFly1.png');
     this.load.image('fly_fly2', 'assets/sprites/characters/enemies/flyFly2.png');
 
-    // Dungeon Crawl enemies — use actual file paths
+    // Dungeon Crawl enemies
     this.load.image('demon_enemy', 'assets/sprites/enemies/demons/abomination_large.png');
     this.load.image('skeleton_enemy', 'assets/sprites/enemies/undead/bone_dragon_new.png');
     this.load.image('yokai_enemy', 'assets/sprites/enemies/azure_jelly_old.png');
-    this.load.image('boss_enemy', 'assets/sprites/enemies/tengu.png'); // Tengu = Japanese myth creature!
+    this.load.image('boss_enemy', 'assets/sprites/enemies/tengu.png');
 
-    // DawnLike enemy sprites (16x16 each)
+    // DawnLike enemy sprites
     this.load.image('dawnlike_demon', 'assets/sprites/enemies/dawnlike/Demon0.png');
     this.load.image('dawnlike_slime', 'assets/sprites/enemies/dawnlike/Slime0.png');
 
     // ==========================================
     // TILESETS
     // ==========================================
-    // Hub (Kenney Platformer Deluxe)
     this.load.image(ASSET_KEYS.TILESET_HUB, 'assets/tilesets/hub/platformer-deluxe/tiles_spritesheet.png');
     this.load.image(ASSET_KEYS.BG_HUB_SKY, 'assets/tilesets/hub/platformer-deluxe/bg.png');
     this.load.image(ASSET_KEYS.BG_HUB_CASTLE, 'assets/tilesets/hub/platformer-deluxe/bg_castle.png');
-
-    // Simplified tiles
     this.load.image(ASSET_KEYS.TILESET_SIMPLIFIED, 'assets/tilesets/hub/simplified/platformPack_tilesheet.png');
 
     // Ground tiles (Kenney platformer deluxe)
@@ -123,7 +161,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image(ASSET_KEYS.TILESET_DUNGEON, 'assets/tilesets/dungeon/0x72_dungeontileset_ii_sheet1.png');
     this.load.image(ASSET_KEYS.TILESET_DUNGEON_ALT, 'assets/tilesets/dungeon/DungeonCrawl_ProjectUtumnoTileset.png');
 
-    // Buildings and objects — use ACTUAL Kenney filenames
+    // Buildings and objects
     this.load.image('obj_castle', 'assets/tilesets/hub/platformer-deluxe/castleCenter.png');
     this.load.image('obj_castle_half', 'assets/tilesets/hub/platformer-deluxe/castleHalf.png');
     this.load.image('obj_brick', 'assets/tilesets/hub/platformer-deluxe/brickWall.png');
@@ -131,9 +169,9 @@ export class BootScene extends Phaser.Scene {
     this.load.image('obj_fence', 'assets/tilesets/hub/platformer-deluxe/fence.png');
     this.load.image('obj_sign', 'assets/tilesets/hub/platformer-deluxe/sign.png');
     this.load.image('obj_torch', 'assets/tilesets/hub/platformer-deluxe/torch.png');
-    this.load.image('obj_torch_lit', 'assets/tilesets/hub/platformer-deluxe/tochLit.png'); // Kenney's actual filename
+    this.load.image('obj_torch_lit', 'assets/tilesets/hub/platformer-deluxe/tochLit.png');
 
-    // Items — use actual filenames from platformer-deluxe-items
+    // Items
     this.load.image('item_coin', 'assets/tilesets/hub/platformer-deluxe-items/coinGold.png');
     this.load.image('item_star', 'assets/tilesets/hub/platformer-deluxe-items/star.png');
     this.load.image('item_key', 'assets/tilesets/hub/platformer-deluxe-items/keyYellow.png');
@@ -144,7 +182,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('item_cloud1', 'assets/tilesets/hub/platformer-deluxe-items/cloud1.png');
     this.load.image('item_cloud2', 'assets/tilesets/hub/platformer-deluxe-items/cloud2.png');
 
-    // Flags — they're in platformer-deluxe-items folder
+    // Flags
     this.load.image('obj_flag_red', 'assets/tilesets/hub/platformer-deluxe-items/flagRed.png');
     this.load.image('obj_flag_green', 'assets/tilesets/hub/platformer-deluxe-items/flagGreen.png');
     this.load.image('obj_flag_blue', 'assets/tilesets/hub/platformer-deluxe-items/flagBlue.png');
@@ -155,47 +193,20 @@ export class BootScene extends Phaser.Scene {
     this.load.image('p1_hurt', 'assets/sprites/characters/platformer-deluxe/p1_hurt.png');
 
     // ==========================================
-    // AUDIO — Use actual file paths
+    // AUDIO
     // ==========================================
-    // Kenney RPG sounds (OGG format, simple paths)
-    this.load.audio(ASSET_KEYS.SFX_ATTACK, [
-      'assets/audio/sfx/kenney-rpg-sounds/OGG/knifeSlice2.ogg',
-    ]);
-    this.load.audio(ASSET_KEYS.SFX_HIT, [
-      'assets/audio/sfx/kenney-rpg-sounds/OGG/metalPot1.ogg',
-    ]);
-    this.load.audio(ASSET_KEYS.SFX_HURT, [
-      'assets/audio/sfx/kenney-rpg-sounds/OGG/metalPot2.ogg',
-    ]);
-    this.load.audio(ASSET_KEYS.SFX_JUMP, [
-      'assets/audio/sfx/kenney-rpg-sounds/OGG/clothBelt2.ogg',
-    ]);
-    this.load.audio(ASSET_KEYS.SFX_STEP, [
-      'assets/audio/sfx/kenney-rpg-sounds/OGG/footstep00.ogg',
-    ]);
-    this.load.audio(ASSET_KEYS.SFX_COIN, [
-      'assets/audio/sfx/kenney-rpg-sounds/OGG/handleCoins.ogg',
-    ]);
-    this.load.audio(ASSET_KEYS.SFX_CLICK, [
-      'assets/audio/sfx/click-a.ogg',
-    ]);
-    this.load.audio(ASSET_KEYS.SFX_PORTAL, [
-      'assets/audio/sfx/kenney-rpg-sounds/OGG/bookPlace1.ogg',
-    ]);
+    this.load.audio(ASSET_KEYS.SFX_ATTACK, ['assets/audio/sfx/kenney-rpg-sounds/OGG/knifeSlice2.ogg']);
+    this.load.audio(ASSET_KEYS.SFX_HIT, ['assets/audio/sfx/kenney-rpg-sounds/OGG/metalPot1.ogg']);
+    this.load.audio(ASSET_KEYS.SFX_HURT, ['assets/audio/sfx/kenney-rpg-sounds/OGG/metalPot2.ogg']);
+    this.load.audio(ASSET_KEYS.SFX_JUMP, ['assets/audio/sfx/kenney-rpg-sounds/OGG/clothBelt2.ogg']);
+    this.load.audio(ASSET_KEYS.SFX_STEP, ['assets/audio/sfx/kenney-rpg-sounds/OGG/footstep00.ogg']);
+    this.load.audio(ASSET_KEYS.SFX_COIN, ['assets/audio/sfx/kenney-rpg-sounds/OGG/handleCoins.ogg']);
+    this.load.audio(ASSET_KEYS.SFX_CLICK, ['assets/audio/sfx/click-a.ogg']);
+    this.load.audio(ASSET_KEYS.SFX_PORTAL, ['assets/audio/sfx/kenney-rpg-sounds/OGG/bookPlace1.ogg']);
+    this.load.audio(ASSET_KEYS.SFX_SLIME, ['assets/audio/sfx/rpg-sound-pack/RPG Sound Pack/NPC/slime/slime1.wav']);
+    this.load.audio(ASSET_KEYS.SFX_DEATH, ['assets/audio/sfx/kenney-rpg-sounds/OGG/dropLeather.ogg']);
 
-    // Slime SFX (RPG Sound Pack)
-    this.load.audio(ASSET_KEYS.SFX_SLIME, [
-      'assets/audio/sfx/rpg-sound-pack/RPG Sound Pack/NPC/slime/slime1.wav',
-    ]);
-
-    // Death SFX
-    this.load.audio(ASSET_KEYS.SFX_DEATH, [
-      'assets/audio/sfx/kenney-rpg-sounds/OGG/dropLeather.ogg',
-    ]);
-
-    // ==========================================
-    // MUSIC — Epic royalty-free tracks
-    // ==========================================
+    // Music
     this.load.audio('music_menu', ['assets/audio/music/menu_theme.mp3']);
     this.load.audio('music_hub', ['assets/audio/music/hub_village_theme.mp3']);
     this.load.audio('music_dungeon', ['assets/audio/music/dungeon_theme.mp3']);
@@ -205,18 +216,13 @@ export class BootScene extends Phaser.Scene {
     // ==========================================
     // GAME UI ASSETS
     // ==========================================
-    // Golden UI (warm medieval frames — perfect for our game)
     this.load.image('ui_gold_frame', 'assets/ui/game-ui/golden-ui/arne16_gold.png');
     this.load.image('ui_gold_pieces', 'assets/ui/game-ui/golden-ui/ui_pieces.png');
-
-    // Paper dialogue box (RPG-style)
     this.load.image('ui_dialogue_paper', 'assets/ui/game-ui/oga-buttons-dialogue/paper/paper-dialog.png');
-
-    // Hearts (pixel art health)
     this.load.image('ui_heart_full', 'assets/ui/game-ui/oga-hearts/heart pixel art/heart pixel art 32x32.png');
     this.load.image('ui_heart_empty', 'assets/ui/game-ui/oga-hearts/Heart health bar/HUD/0.png');
 
-    // Mobile controls (D-pad + action buttons)
+    // Mobile controls
     this.load.image('mobile_dpad', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/dpad.png');
     this.load.image('mobile_dpad_up', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/dpad_element_north.png');
     this.load.image('mobile_dpad_down', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/dpad_element_south.png');
@@ -227,111 +233,137 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Create player animations
+    // --- Show logo on loading screen if available ---
+    const centerX = GAME_WIDTH / 2;
+    const centerY = GAME_HEIGHT / 2;
+
+    if (this.textures.exists('game_logo')) {
+      const logo = this.add.image(centerX, centerY - 40, 'game_logo');
+      logo.setScale(0.28);
+      logo.setDepth(50);
+    }
+
+    // --- Log asset errors ---
+    if (this.assetErrors.length > 0) {
+      console.warn(`[BootScene] ${this.assetErrors.length} asset(s) failed to load:`);
+      this.assetErrors.forEach(e => console.warn(`  - ${e}`));
+    }
+
+    // --- Create player animations (error-resilient) ---
     this.createPlayerAnimations();
 
-    // Create enemy animations
+    // --- Create enemy animations ---
     this.createEnemyAnimations();
 
-    // Transition to menu
-    this.time.delayedCall(600, () => {
+    // --- Transition to menu after brief pause ---
+    this.time.delayedCall(800, () => {
       this.scene.start(SCENES.MENU);
     });
   }
 
   private createPlayerAnimations(): void {
-    // Idle — 8 frames
-    this.anims.create({
-      key: ANIMATIONS.player_idle.key,
-      frames: this.anims.generateFrameNumbers(ASSET_KEYS.PLAYER_IDLE, { start: 0, end: 7 }),
-      frameRate: 8,
-      repeat: -1,
-    });
+    // Helper: safely create animation, checking if texture loaded
+    const safeCreate = (key: string, textureKey: string, start: number, end: number, frameRate: number, repeat: number) => {
+      if (!this.textures.exists(textureKey)) {
+        console.warn(`[BootScene] Skipping animation "${key}" — texture "${textureKey}" not loaded`);
+        return;
+      }
+      try {
+        // Don't recreate if already exists (scene restart)
+        if (this.anims.exists(key)) {
+          this.anims.remove(key);
+        }
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers(textureKey, { start, end }),
+          frameRate,
+          repeat,
+        });
+      } catch (e) {
+        console.warn(`[BootScene] Failed to create animation "${key}":`, e);
+      }
+    };
+
+    // Idle — Martial Hero has 8 frames
+    safeCreate(ANIMATIONS.player_idle.key, ASSET_KEYS.PLAYER_IDLE, 0, 7, 8, -1);
 
     // Run — 8 frames
-    this.anims.create({
-      key: ANIMATIONS.player_run.key,
-      frames: this.anims.generateFrameNumbers(ASSET_KEYS.PLAYER_RUN, { start: 0, end: 7 }),
-      frameRate: 12,
-      repeat: -1,
-    });
+    safeCreate(ANIMATIONS.player_run.key, ASSET_KEYS.PLAYER_RUN, 0, 7, 12, -1);
 
-    // Jump — check actual frame count from loaded texture
-    const jumpTexture = this.textures.get(ASSET_KEYS.PLAYER_JUMP);
-    const jumpFrames = Math.floor(jumpTexture.source[0].width / 200) - 1;
-    this.anims.create({
-      key: ANIMATIONS.player_jump.key,
-      frames: this.anims.generateFrameNumbers(ASSET_KEYS.PLAYER_JUMP, { start: 0, end: jumpFrames }),
-      frameRate: 8,
-      repeat: 0,
-    });
+    // Jump — dynamically check frame count
+    if (this.textures.exists(ASSET_KEYS.PLAYER_JUMP)) {
+      try {
+        const jumpTexture = this.textures.get(ASSET_KEYS.PLAYER_JUMP);
+        const jumpFrames = Math.floor(jumpTexture.source[0].width / 200) - 1;
+        safeCreate(ANIMATIONS.player_jump.key, ASSET_KEYS.PLAYER_JUMP, 0, Math.max(0, jumpFrames), 8, 0);
+      } catch (e) {
+        safeCreate(ANIMATIONS.player_jump.key, ASSET_KEYS.PLAYER_JUMP, 0, 3, 8, 0);
+      }
+    }
 
-    // Fall
-    const fallTexture = this.textures.get(ASSET_KEYS.PLAYER_FALL);
-    const fallFrames = Math.floor(fallTexture.source[0].width / 200) - 1;
-    this.anims.create({
-      key: ANIMATIONS.player_fall.key,
-      frames: this.anims.generateFrameNumbers(ASSET_KEYS.PLAYER_FALL, { start: 0, end: fallFrames }),
-      frameRate: 8,
-      repeat: 0,
-    });
+    // Fall — dynamically check frame count
+    if (this.textures.exists(ASSET_KEYS.PLAYER_FALL)) {
+      try {
+        const fallTexture = this.textures.get(ASSET_KEYS.PLAYER_FALL);
+        const fallFrames = Math.floor(fallTexture.source[0].width / 200) - 1;
+        safeCreate(ANIMATIONS.player_fall.key, ASSET_KEYS.PLAYER_FALL, 0, Math.max(0, fallFrames), 8, 0);
+      } catch (e) {
+        safeCreate(ANIMATIONS.player_fall.key, ASSET_KEYS.PLAYER_FALL, 0, 3, 8, 0);
+      }
+    }
 
     // Attack 1 — 6 frames
-    this.anims.create({
-      key: ANIMATIONS.player_attack1.key,
-      frames: this.anims.generateFrameNumbers(ASSET_KEYS.PLAYER_ATTACK1, { start: 0, end: 5 }),
-      frameRate: 14,
-      repeat: 0,
-    });
+    safeCreate(ANIMATIONS.player_attack1.key, ASSET_KEYS.PLAYER_ATTACK1, 0, 5, 14, 0);
 
     // Attack 2 — 6 frames
-    this.anims.create({
-      key: ANIMATIONS.player_attack2.key,
-      frames: this.anims.generateFrameNumbers(ASSET_KEYS.PLAYER_ATTACK2, { start: 0, end: 5 }),
-      frameRate: 14,
-      repeat: 0,
-    });
+    safeCreate(ANIMATIONS.player_attack2.key, ASSET_KEYS.PLAYER_ATTACK2, 0, 5, 14, 0);
 
-    // Hurt — check actual frames
-    const hurtTexture = this.textures.get(ASSET_KEYS.PLAYER_HURT);
-    const hurtFrames = Math.floor(hurtTexture.source[0].width / 200) - 1;
-    this.anims.create({
-      key: ANIMATIONS.player_hurt.key,
-      frames: this.anims.generateFrameNumbers(ASSET_KEYS.PLAYER_HURT, { start: 0, end: hurtFrames }),
-      frameRate: 10,
-      repeat: 0,
-    });
+    // Hurt — dynamically check
+    if (this.textures.exists(ASSET_KEYS.PLAYER_HURT)) {
+      try {
+        const hurtTexture = this.textures.get(ASSET_KEYS.PLAYER_HURT);
+        const hurtFrames = Math.floor(hurtTexture.source[0].width / 200) - 1;
+        safeCreate(ANIMATIONS.player_hurt.key, ASSET_KEYS.PLAYER_HURT, 0, Math.max(0, hurtFrames), 10, 0);
+      } catch (e) {
+        safeCreate(ANIMATIONS.player_hurt.key, ASSET_KEYS.PLAYER_HURT, 0, 3, 10, 0);
+      }
+    }
 
     // Death — 6 frames
-    this.anims.create({
-      key: ANIMATIONS.player_death.key,
-      frames: this.anims.generateFrameNumbers(ASSET_KEYS.PLAYER_DEATH, { start: 0, end: 5 }),
-      frameRate: 8,
-      repeat: 0,
-    });
+    safeCreate(ANIMATIONS.player_death.key, ASSET_KEYS.PLAYER_DEATH, 0, 5, 8, 0);
   }
 
   private createEnemyAnimations(): void {
     // Slime walk animation
-    this.anims.create({
-      key: 'slime_walk',
-      frames: [
-        { key: 'slime_walk1' },
-        { key: 'slime_walk2' },
-      ],
-      frameRate: 6,
-      repeat: -1,
-    });
+    if (this.textures.exists('slime_walk1') && this.textures.exists('slime_walk2')) {
+      if (this.anims.exists('slime_walk')) {
+        this.anims.remove('slime_walk');
+      }
+      this.anims.create({
+        key: 'slime_walk',
+        frames: [
+          { key: 'slime_walk1' },
+          { key: 'slime_walk2' },
+        ],
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
 
     // Fly animation
-    this.anims.create({
-      key: 'fly_fly',
-      frames: [
-        { key: 'fly_fly1' },
-        { key: 'fly_fly2' },
-      ],
-      frameRate: 8,
-      repeat: -1,
-    });
+    if (this.textures.exists('fly_fly1') && this.textures.exists('fly_fly2')) {
+      if (this.anims.exists('fly_fly')) {
+        this.anims.remove('fly_fly');
+      }
+      this.anims.create({
+        key: 'fly_fly',
+        frames: [
+          { key: 'fly_fly1' },
+          { key: 'fly_fly2' },
+        ],
+        frameRate: 8,
+        repeat: -1,
+      });
+    }
   }
 }

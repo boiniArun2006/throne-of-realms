@@ -2,6 +2,7 @@
 // THRONE OF REALMS — HUD Scene
 // Overlay UI showing health, weapon, dungeon info
 // Runs in parallel with game scenes
+// FIXED: Removed zero-size physics world access
 // ============================================================
 
 import Phaser from 'phaser';
@@ -11,11 +12,12 @@ import { useGameState } from '../GameState';
 export class HUDScene extends Phaser.Scene {
   private healthBar!: Phaser.GameObjects.Graphics;
   private healthText!: Phaser.GameObjects.Text;
-  private weaponIcon!: Phaser.GameObjects.Image;
   private weaponName!: Phaser.GameObjects.Text;
   private dungeonName!: Phaser.GameObjects.Text;
   private comboText!: Phaser.GameObjects.Text;
   private interactionHint!: Phaser.GameObjects.Text;
+  private pauseOverlay!: Phaser.GameObjects.Container;
+  private isPaused: boolean = false;
 
   private currentHp: number = 100;
   private maxHp: number = 100;
@@ -27,8 +29,7 @@ export class HUDScene extends Phaser.Scene {
 
   create(): void {
     // HUD should not be affected by camera scroll
-    this.cameras.main.setScroll(0, 0);
-    this.physics.world.setBounds(0, 0, 0, 0);
+    // FIXED: Don't touch physics.world in HUD scene — it's an overlay only
 
     // --- Health Bar ---
     this.healthBar = this.add.graphics();
@@ -80,11 +81,24 @@ export class HUDScene extends Phaser.Scene {
       strokeThickness: 2,
     }).setOrigin(0.5).setDepth(100);
 
+    // --- Pause Overlay ---
+    this.createPauseOverlay();
+
+    // --- Pause input ---
+    this.input.keyboard?.on('keydown-ESC', () => {
+      this.togglePause();
+    });
+    this.input.keyboard?.on('keydown-P', () => {
+      this.togglePause();
+    });
+
     // --- Setup event listeners from game state ---
     this.setupStateListeners();
   }
 
   update(_time: number, delta: number): void {
+    if (this.isPaused) return;
+
     // Smooth health bar interpolation
     if (this.displayHp !== this.currentHp) {
       const diff = this.currentHp - this.displayHp;
@@ -141,6 +155,64 @@ export class HUDScene extends Phaser.Scene {
     }
   }
 
+  // ============================================================
+  // PAUSE MENU
+  // ============================================================
+  private createPauseOverlay(): void {
+    this.pauseOverlay = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+    this.pauseOverlay.setDepth(500);
+    this.pauseOverlay.setVisible(false);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0a0a1e, 0.85);
+    bg.fillRoundedRect(-150, -120, 300, 240, 12);
+    bg.lineStyle(2, 0xffd700, 0.6);
+    bg.strokeRoundedRect(-150, -120, 300, 240, 12);
+
+    const title = this.add.text(0, -90, 'PAUSED', {
+      fontSize: '24px', fontFamily: '"Press Start 2P", monospace', color: '#ffd700',
+    }).setOrigin(0.5);
+
+    const resumeText = this.add.text(0, -30, 'Press ESC/P to Resume', {
+      fontSize: '10px', fontFamily: '"Press Start 2P", monospace', color: '#e0e0e0',
+    }).setOrigin(0.5);
+
+    const controlsText = this.add.text(0, 10, 'Controls:', {
+      fontSize: '10px', fontFamily: '"Press Start 2P", monospace', color: '#ffd700',
+    }).setOrigin(0.5);
+
+    const moveText = this.add.text(0, 35, 'Arrow Keys / WASD - Move', {
+      fontSize: '8px', fontFamily: '"Press Start 2P", monospace', color: '#b0b0b0',
+    }).setOrigin(0.5);
+
+    const attackText = this.add.text(0, 55, 'Z / Space - Attack', {
+      fontSize: '8px', fontFamily: '"Press Start 2P", monospace', color: '#b0b0b0',
+    }).setOrigin(0.5);
+
+    const interactText = this.add.text(0, 75, 'X - Interact', {
+      fontSize: '8px', fontFamily: '"Press Start 2P", monospace', color: '#b0b0b0',
+    }).setOrigin(0.5);
+
+    const versionText = this.add.text(0, 100, 'v0.3.0-alpha', {
+      fontSize: '8px', fontFamily: 'monospace', color: '#606060',
+    }).setOrigin(0.5);
+
+    this.pauseOverlay.add([bg, title, resumeText, controlsText, moveText, attackText, interactText, versionText]);
+  }
+
+  private togglePause(): void {
+    this.isPaused = !this.isPaused;
+    this.pauseOverlay.setVisible(this.isPaused);
+
+    if (this.isPaused) {
+      this.scene.pause(SCENES.HUB);
+      this.scene.pause(SCENES.DUNGEON);
+    } else {
+      this.scene.resume(SCENES.HUB);
+      this.scene.resume(SCENES.DUNGEON);
+    }
+  }
+
   public updateHealth(hp: number, maxHp: number): void {
     this.currentHp = hp;
     this.maxHp = maxHp;
@@ -172,7 +244,6 @@ export class HUDScene extends Phaser.Scene {
   }
 
   private setupStateListeners(): void {
-    // Listen for game state changes
     const gameState = useGameState.getState();
 
     // Initial values

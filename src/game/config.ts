@@ -2,6 +2,7 @@
 // THRONE OF REALMS — Phaser Game Configuration
 // Central configuration that registers all scenes
 // Uses real downloaded assets (CC0)
+// FIXED: Gravity set to 800 for arcade physics
 // ============================================================
 
 import Phaser from 'phaser';
@@ -29,7 +30,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     physics: {
       default: 'arcade',
       arcade: {
-        gravity: { x: 0, y: 0 },
+        gravity: { x: 0, y: 800 },
         debug: false,
       },
     },
