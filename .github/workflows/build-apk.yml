@@ -39,40 +39,29 @@ jobs:
       - name: 📦 Install dependencies
         run: bun install --frozen-lockfile 2>/dev/null || bun install
 
-      - name: 🏗️ Build Next.js project
+      - name: 🏗️ Build Next.js static export
         run: |
-          echo "Building Next.js project..."
-          bun run build 2>&1 || echo "Build completed with warnings"
+          echo "Building Next.js static export..."
+          bun run build 2>&1
           echo "Checking output..."
-          ls -la .next/ 2>/dev/null | head -10 || echo "No .next directory"
+          ls -la out/ | head -15
+          echo "Checking game page..."
+          ls -la out/assets/ | head -10
 
-      - name: 📋 Prepare static files for Capacitor
+      - name: 📋 Prepare Capacitor webDir
         run: |
-          echo "Preparing webDir for Capacitor..."
-          mkdir -p www
-          # Copy public assets (game assets, audio, fonts)
-          cp -r public/* www/ 2>/dev/null || true
-          # Create a proper index.html that loads the game
-          cat > www/index.html << 'INDEXEOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <title>Throne of Realms</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { background: #0a0a1e; overflow: hidden; touch-action: none; }
-              #game-container { width: 100vw; height: 100vh; }
-            </style>
-          </head>
-          <body>
-            <div id="game-container"></div>
-          </body>
-          </html>
-          INDEXEOF
-          echo "www directory ready:"
-          ls -la www/ | head -10
+          echo "Preparing Capacitor webDir from static export..."
+          # The 'out' directory contains the full static export
+          # Copy it as the Capacitor webDir
+          rm -rf www 2>/dev/null || true
+          cp -r out www
+          # Verify the game page exists
+          echo "Checking www contents:"
+          ls -la www/ | head -15
+          echo "Checking assets:"
+          ls -la www/assets/ | head -10
+          echo "Checking HTML:"
+          head -5 www/index.html
 
       - name: ⚙️ Configure Capacitor
         run: |
