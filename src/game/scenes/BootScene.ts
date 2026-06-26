@@ -192,6 +192,38 @@ export class BootScene extends Phaser.Scene {
     this.load.audio(ASSET_KEYS.SFX_DEATH, [
       'assets/audio/sfx/kenney-rpg-sounds/OGG/dropLeather.ogg',
     ]);
+
+    // ==========================================
+    // MUSIC — Epic royalty-free tracks
+    // ==========================================
+    this.load.audio('music_menu', ['assets/audio/music/menu_theme.mp3']);
+    this.load.audio('music_hub', ['assets/audio/music/hub_village_theme.mp3']);
+    this.load.audio('music_dungeon', ['assets/audio/music/dungeon_theme.mp3']);
+    this.load.audio('music_boss', ['assets/audio/music/boss_battle_theme.mp3']);
+    this.load.audio('music_victory', ['assets/audio/music/victory_theme.mp3']);
+
+    // ==========================================
+    // GAME UI ASSETS
+    // ==========================================
+    // Golden UI (warm medieval frames — perfect for our game)
+    this.load.image('ui_gold_frame', 'assets/ui/game-ui/golden-ui/arne16_gold.png');
+    this.load.image('ui_gold_pieces', 'assets/ui/game-ui/golden-ui/ui_pieces.png');
+
+    // Paper dialogue box (RPG-style)
+    this.load.image('ui_dialogue_paper', 'assets/ui/game-ui/oga-buttons-dialogue/paper/paper-dialog.png');
+
+    // Hearts (pixel art health)
+    this.load.image('ui_heart_full', 'assets/ui/game-ui/oga-hearts/heart pixel art/heart pixel art 32x32.png');
+    this.load.image('ui_heart_empty', 'assets/ui/game-ui/oga-hearts/Heart health bar/HUD/0.png');
+
+    // Mobile controls (D-pad + action buttons)
+    this.load.image('mobile_dpad', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/dpad.png');
+    this.load.image('mobile_dpad_up', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/dpad_element_north.png');
+    this.load.image('mobile_dpad_down', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/dpad_element_south.png');
+    this.load.image('mobile_dpad_left', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/dpad_element_west.png');
+    this.load.image('mobile_dpad_right', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/dpad_element_east.png');
+    this.load.image('mobile_btn_attack', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/button_square.png');
+    this.load.image('mobile_btn_interact', 'assets/ui/mobile-controls/kenney-mobile-controls/Sprites/Style F/Default/button_diamond.png');
   }
 
   create(): void {

@@ -13,6 +13,7 @@ import { DUNGEON_CONFIGS } from '../data/dungeons';
 import { DIALOGUES } from '../data/dialogues';
 import { useGameState } from '../GameState';
 import { ASSET_KEYS, ANIMATIONS } from '../AssetManifest';
+import { MusicManager } from '../systems/MusicManager';
 
 const GROUND_Y = 460;
 
@@ -25,6 +26,7 @@ export class DungeonScene extends Phaser.Scene {
   private dungeonConfig: any;
   private exitPortal!: Phaser.GameObjects.Sprite;
   private dungeonComplete: boolean = false;
+  private musicManager!: MusicManager;
 
   // Dialogue
   private dialogueActive: boolean = false;
@@ -49,6 +51,10 @@ export class DungeonScene extends Phaser.Scene {
   create(): void {
     const gameState = useGameState.getState();
     gameState.setCurrentScene(SCENES.DUNGEON);
+
+    // --- Music ---
+    this.musicManager = new MusicManager(this);
+    this.musicManager.play('music_dungeon', { volume: 0.25, loop: true });
 
     // --- Background ---
     this.createDungeonBackground();
@@ -355,6 +361,9 @@ export class DungeonScene extends Phaser.Scene {
   private onDungeonCleared(): void {
     this.dungeonComplete = true;
     const gameState = useGameState.getState();
+
+    // Switch to victory music
+    this.musicManager.play('music_victory', { volume: 0.3, loop: false });
 
     this.exitPortal.setVisible(true);
     this.exitPortal.setPosition(this.dungeonConfig.width - 100, GROUND_Y - 40);

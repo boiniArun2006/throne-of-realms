@@ -39,6 +39,8 @@ export default function GameContainer() {
         });
 
         gameRef.current = game;
+        // Expose game instance for testing/debugging
+        (window as any).__PHASER_GAME__ = game;
         setIsLoading(false);
 
         // Handle game events

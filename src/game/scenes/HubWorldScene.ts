@@ -6,6 +6,7 @@
 
 import Phaser from 'phaser';
 import { SCENES, GAME_WIDTH, GAME_HEIGHT, TILE_SIZE, COLORS, CHARACTERS } from '../constants';
+import { MusicManager } from '../systems/MusicManager';
 import { ASSET_KEYS, ANIMATIONS } from '../AssetManifest';
 import { Player } from '../entities/Player';
 import { DIALOGUES } from '../data/dialogues';
@@ -27,6 +28,7 @@ export class HubWorldScene extends Phaser.Scene {
   private dialogueIndex: number = 0;
   private _dialogueOnComplete: (() => void) | null = null;
   private bathroomPortal!: Phaser.GameObjects.Sprite;
+  private musicManager!: MusicManager;
 
   constructor() {
     super({ key: SCENES.HUB });
@@ -35,6 +37,10 @@ export class HubWorldScene extends Phaser.Scene {
   create(): void {
     const gameState = useGameState.getState();
     gameState.setCurrentScene(SCENES.HUB);
+
+    // --- Music ---
+    this.musicManager = new MusicManager(this);
+    this.musicManager.play('music_hub', { volume: 0.2, loop: true });
 
     // --- Parallax Background ---
     this.createBackground();
@@ -537,6 +543,12 @@ export class HubWorldScene extends Phaser.Scene {
   }
 
   private transitionToDungeon(): void {
+    // Play portal SFX
+    if (this.cache.audio.exists('sfx_portal')) {
+      this.sound.play('sfx_portal', { volume: 0.5 });
+    }
+
+    this.musicManager.stop(500);
     this.cameras.main.flash(300, 138, 43, 226);
     this.cameras.main.shake(200, 0.01);
 
@@ -567,11 +579,11 @@ export class HubWorldScene extends Phaser.Scene {
     bg.strokeRoundedRect(-GAME_WIDTH / 2 + 20, -50, GAME_WIDTH - 40, 100, 8);
 
     const speakerText = this.add.text(-GAME_WIDTH / 2 + 40, -40, '', {
-      fontSize: '14px', fontFamily: 'monospace', fontStyle: 'bold', color: '#ffd700',
+      fontSize: '14px', fontFamily: '"Press Start 2P", monospace', fontStyle: 'bold', color: '#ffd700',
     });
 
     const dialogueText = this.add.text(-GAME_WIDTH / 2 + 40, -18, '', {
-      fontSize: '13px', fontFamily: 'monospace', color: '#e0e0e0',
+      fontSize: '11px', fontFamily: '"Press Start 2P", monospace', color: '#e0e0e0',
       wordWrap: { width: GAME_WIDTH - 100 }, lineSpacing: 4,
     });
 

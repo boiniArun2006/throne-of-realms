@@ -229,6 +229,11 @@ export class Player extends Phaser.GameObjects.Container {
       hitbox: this.attackHitbox,
     });
 
+    // Play attack SFX
+    if (this.scene.cache.audio.exists('sfx_attack')) {
+      this.scene.sound.play('sfx_attack', { volume: 0.4 });
+    }
+
     // Screen shake on combo
     if (this.comboCount >= 2) {
       this.scene.cameras.main.shake(50 + this.comboCount * 25, 0.003 + this.comboCount * 0.002);
@@ -262,6 +267,11 @@ export class Player extends Phaser.GameObjects.Container {
     // Play hurt animation
     this.sprite.play(ANIMATIONS.player_hurt.key);
     this.scene.cameras.main.shake(100, 0.005);
+
+    // Play hurt SFX
+    if (this.scene.cache.audio.exists('sfx_hurt')) {
+      this.scene.sound.play('sfx_hurt', { volume: 0.4 });
+    }
 
     this.events.emit('hurt', { hp: this.hp, maxHp: this.maxHp });
 
