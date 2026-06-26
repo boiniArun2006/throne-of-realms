@@ -75,3 +75,25 @@ Stage Summary:
 - Mobile-ready: Touch D-pad and action buttons for Android
 - Capacitor configured for Android APK export
 - Zero console errors after fixes
+
+---
+Task ID: 3
+Agent: Main
+Task: Push to GitHub, add license, set up APK build via GitHub Actions
+
+Work Log:
+- Created GPL-3.0 license with full CC0/CC-BY/OFL asset attribution
+- Created professional README with story, features, controls, tech stack
+- Created GitHub repo: boiniArun2006/throne-of-realms (public)
+- Pushed all 11,469+ assets and source code to GitHub
+- Set up GitHub Actions workflow for automated Android APK build
+- Fixed workflow for Capacitor: dist directory as webDir
+- Android build steps: Bun + Node + Java 17 + Android SDK + Capacitor + Gradle
+- APK artifact uploaded on every push to main
+- Release APK on tag push
+
+Stage Summary:
+- Project live at: https://github.com/boiniArun2006/throne-of-realms
+- GPL-3.0 license (strict copyleft — derivatives must also be open source)
+- GitHub Actions CI/CD for Android APK builds
+- APK downloadable as artifact from Actions tab
